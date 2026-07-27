@@ -1,0 +1,115 @@
+# ===== VSCode =====
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+
+# ===== C++ =====
+# Compiled objects
+*.o
+*.obj
+*.elf
+*.exe
+*.out
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Build directories
+build/
+Build/
+BUILD/
+cmake-build-*/
+out/
+bin/
+obj/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.Python
+
+# Distribution / packaging
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing / coverage
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Type checkers
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Environment variables
+.env
+.env.*
+
+# ===== OS files =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===== Logs & misc =====
+*.log
+*.tmp
+*.bak
+*.swp
+*~
