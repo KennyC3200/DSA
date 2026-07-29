@@ -21,8 +21,11 @@ public:
         , m_node_alloc(alloc) {}
 
     ~NodeGraph() {
-        DestroyAll();
+        // Deconstruct all nodes and then deallocate the memory
+        for (size_type i = 0; i < m_size; i++)
+            node_alloc_traits::destroy(m_node_alloc, m_data + i);
         if (m_data) node_alloc_traits::deallocate(m_node_alloc, m_data, m_capacity);
+        m_size = 0;
     }
 
     NodeGraph(const NodeGraph&) = delete;
@@ -42,7 +45,7 @@ public:
 
     template <typename... Args>
     size_type AddNode(Args&&... args) {
-        // If max capacity is reached, double the capacity
+        // Check current size to max capacity
         if (m_size == m_capacity) {
             size_type new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
             Relocate(new_capacity);
@@ -80,12 +83,6 @@ public:
     allocator_type GetAllocator() { return m_alloc; }
 
 private:
-    void DestroyAll() {
-        for (size_type i = 0; i < m_size; i++)
-            node_alloc_traits::destroy(m_node_alloc, m_data + i);
-        m_size = 0;
-    }
-
     void Relocate(size_type new_capacity) {
         // Allocate new chunk of memory and move the nodes over
         node_type* new_data = node_alloc_traits::allocate(m_node_alloc, new_capacity);
@@ -100,9 +97,12 @@ private:
             throw;
         }
 
-        // Deallocate the previously allocated memory used by the nodes
-        DestroyAll();
+        // Destroy and deallocate the previous nodes
+        for (size_type i = 0; i < m_size; i++)
+            node_alloc_traits::destroy(m_node_alloc, m_data + i);
         if (m_data) node_alloc_traits::deallocate(m_node_alloc, m_data, m_capacity);
+
+        // Update the data pointers
         m_data = new_data;
         m_capacity = new_capacity;
     }
