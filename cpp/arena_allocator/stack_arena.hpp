@@ -22,7 +22,7 @@ public:
 
     template <std::size_t ReqAlign> 
     [[nodiscard]] std::byte* allocate(std::size_t n) {
-        static_assert(ReqAlign <= alignment, "ReqAlign is too large for the arena");
+        static_assert(ReqAlign <= alignment, "the alignment is too small for this arena");
         assert(ptr_in_buffer(m_ptr) && "short_alloc has outlived the arena");
         auto const aligned_n = align_up_pow2(n, alignment);
 
