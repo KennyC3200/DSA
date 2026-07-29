@@ -3,6 +3,25 @@ This is based off of Howard Hinnant's [stack_alloc](https://howardhinnant.github
 
 This implementation, contrary to most implementations, is a custom allocator that can be used with the standard library. It involves two classes: `arena` and `short_alloc`. The `arena` class is the main object keeping track of the data, while `short_alloc` is a container for `arena` which provides countless conveniences.
 
+## Usage
+You have to first instantiate the underlying `arena` to initialize the buffer before implicitly casting it to be of type `short_alloc` for use. The templated type of the buffer of `arena` does not matter since it can be rebinded to a different templated type which depends on the templated type of the `short_alloc`:
+```cpp
+template <typename T, std::size_t BufferSize = 200>
+using SmallVector = std::vector<T, short_alloc<T, Buffersize, alignof(T)>>;
+
+int main(void) {
+    // A std::vector with type int and 200 bytes allocated for the arena
+    SmallVector<int>::allocator_type::arena_type arena;
+
+    // NOTE: type arena_type is implicitly casted to be type short_alloc from constructor for
+    //       short_alloc. This design choice is intentional
+    SmallVector<int> vec(arena);
+
+    return 0;
+}
+```
+You also have to ensure that the `buffer` size is a multiple of the `Alignment`, or else the program will not compile. In this case, `alignof(int)` is 4 bytes, and `200 % 4 == 0` so we're good.
+
 ## Implementation of `arena`
 The `arena` class uses a finite stack with max alignment of `alignment` for initial allocations and uses a heap for fallback allocations. 
 
@@ -31,7 +50,7 @@ using _Alty_traits = allocator_traits<_Alty>;
      ```
      Under the hood, `allocator_traits` does this by using two fallback rules:
      1. If the allocator explicity provides a nested `rebind` template (e.g. `Alloc::rebind<U>::other`, it uses that)
-     2. If the allocator is a class template, like `Alloc<T, Args ...>`, `allocator_traits` automatically replaces `T` with `_Ty` to yield `Alloc<_Ty, Args ...>`
+     2. If the allocator is a class template, like `Alloc<T, Args ...>`, `allocator_traits` automatically replaces `T` with `_Ty` to yield `Alloc<_Ty, Args ...>`. **Important:** this fallback only works if **ALL** template parameters are types. So in the `short_stack<class T, std::size_t N, std::size_t Align>` case, this fallback would not work, since `N` and `Align` are values and not types.
 - `_Alty_traits` is short for "Allocator traits", which wraps `_Alty` in `std::allocator_traits` to access memory operations (e.g. `allocate`, `deallocate`, `construct`, and `destroy`). Prior to C++11, every custom allocator required a dozen mandatory typedefs (`pointer`, `const_pointer`, `reference`, etc.) and member functions (`construct`, `destroy`, etc.) which made custom allocators verbose and tedious to write. `allocator_traits` provides **defualts** for almost everything. Rather than call allocator methods directly:
     ```cpp
     alloc.construct(ptr, val);
