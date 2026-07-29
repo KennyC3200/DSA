@@ -21,8 +21,8 @@ public:
     arena& operator=(const arena&) = delete;
 
     template <std::size_t ReqAlign> 
-    std::byte* allocate(std::size_t n) {
-        static_assert(ReqAlign <= alignment, "alignment is too small for the arena");
+    [[nodiscard]] std::byte* allocate(std::size_t n) {
+        static_assert(ReqAlign <= alignment, "ReqAlign is too large for the arena");
         assert(ptr_in_buffer(m_ptr) && "short_alloc has outlived the arena");
         auto const aligned_n = align_up_pow2(n, alignment);
 
@@ -75,6 +75,7 @@ public:
     static constexpr std::size_t size() noexcept { return N; }
     std::size_t used() const noexcept { return static_cast<std::size_t>(m_ptr - m_buffer); }
     void reset() noexcept { m_ptr = m_buffer; }
+
 private:
     static constexpr std::size_t align_up_pow2(std::size_t n, std::size_t p) noexcept {
         assert(p != 0 && (p & (p - 1)) == 0);
@@ -111,7 +112,10 @@ public:
     template <class U>
     short_alloc(const short_alloc<U, N, alignment>& a) noexcept : m_arena(a.m_arena) {}
 
-    T* allocate(std::size_t n) {
+    template <class U>
+    struct rebind { using other = short_alloc<U, N, Align>; };
+
+    [[nodiscard]] T* allocate(std::size_t n) {
         return reinterpret_cast<T*>(m_arena.template allocate<alignof(T)>(n * sizeof(T)));
     }
 
@@ -122,22 +126,28 @@ public:
     template <class T1, std::size_t N1, std::size_t A1, class U, std::size_t M, std::size_t A2>
     friend bool operator==(
         const short_alloc<T1, N1, A1>& x, 
-        const short_alloc<U, M, A2>& y) noexcept
-    {
-        return N1 == M && A1 == A2 && &x.m_arena == &y.m_arena;
-    }
+        const short_alloc<U, M, A2>& y) noexcept;
+
+    template <class U, std::size_t M, std::size_t A> friend class short_alloc;
+
+private:
+    arena_type& m_arena;
+};
+
+template <class T1, std::size_t N1, std::size_t A1, class U, std::size_t M, std::size_t A2>
+inline bool operator==(
+    const short_alloc<T1, N1, A1>& x, 
+    const short_alloc<U, M, A2>& y) noexcept
+{
+    return N1 == M && A1 == A2 && &x.m_arena == &y.m_arena;
+}
 
 #if (defined(_MSVC_LANG) && _MSVC_LANG < 202002L) || (!defined(_MSVC_LANG) && __cplusplus < 202002L)
     template <class T1, std::size_t N1, std::size_t A1, class U, std::size_t M, std::size_t A2>
-    friend bool operator!=(
+    inline bool operator!=(
         const short_alloc<T1, N1, A1>& x, 
         const short_alloc<U, M, A2>& y) noexcept 
     {
         return !(x == y);
     }
 #endif
-
-    template <class U, std::size_t M, std::size_t A> friend class short_alloc;
-private:
-    arena_type& m_arena;
-};

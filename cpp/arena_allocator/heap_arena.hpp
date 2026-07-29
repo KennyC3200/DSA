@@ -106,6 +106,7 @@ public:
     void Pop(size_t size) { m_pos = (size > m_pos) ? 0 : m_pos - size; }
     void PopTo(size_t pos) { assert(pos > m_pos); m_pos = pos; }
     void Clear() { m_pos = 0; }
+
 private:
     size_t m_reserve_size;
     size_t m_commit_size;
