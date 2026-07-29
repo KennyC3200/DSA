@@ -1,3 +1,6 @@
+# ===== Testing Files =====
+test.cpp
+
 # ===== VSCode =====
 .vscode/*
 !.vscode/settings.json
