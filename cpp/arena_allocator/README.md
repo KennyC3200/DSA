@@ -1,5 +1,5 @@
-# Stack Arena
-This is based off of Howard Hinnant's [stack_alloc](https://howardhinnant.github.io/stack_alloc.html), which is an implementation of an arena allocator that utilizes the stack and fallback heap.
+# Arena Allocator
+This version of arena allocator is based off of Howard Hinnant's [stack_alloc](https://howardhinnant.github.io/stack_alloc.html), which is an implementation of an arena allocator that utilizes the stack and fallback heap.
 
 This implementation, contrary to most implementations, is a custom allocator that can be used with the standard library. It involves two classes: `arena` and `short_alloc`. The `arena` class is the main object keeping track of the data, while `short_alloc` is a container for `arena` which provides countless conveniences.
 
