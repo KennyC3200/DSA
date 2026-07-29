@@ -7,7 +7,7 @@ class Node {
 public:
     using value_type = T;
     using allocator_type = Alloc;
-    using size_type  = std::size_t;
+    using size_type = std::size_t;
 
     using edge_alloc = typename std::allocator_traits<Alloc>::template rebind_alloc<size_type>;
     using edge_container = std::vector<size_type, edge_alloc>;
