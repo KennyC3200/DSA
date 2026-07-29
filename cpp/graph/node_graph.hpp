@@ -42,7 +42,7 @@ public:
 
     template <typename... Args>
     size_type AddNode(Args&&... args) {
-        // Check if max capacity is reached
+        // If max capacity is reached, double the capacity
         if (m_size == m_capacity) {
             size_type new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
             Relocate(new_capacity);
@@ -71,9 +71,10 @@ public:
     size_type Capacity() const noexcept { return m_capacity; }
     bool Empty() const noexcept { return m_size == 0; }
 
-    void Reserve(size_type new_capacity) {
-        if (new_capacity > m_capacity)
-            Relocate(new_capacity);
+    // Allocates memory for `capacity` nodes but no nodes have been constructed yet
+    void Reserve(size_type capacity) {
+        if (capacity > m_capacity)
+            Relocate(capacity);
     }
 
     allocator_type GetAllocator() { return m_alloc; }

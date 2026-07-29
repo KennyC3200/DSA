@@ -59,3 +59,11 @@ int main(void) {
     return 0;
 }
 ```
+
+## Node Class
+The node class itself uses `32 + sizeof(T) + padding(T)` bytes:
+```
+T m_val;
+edge_container m_edges;
+```
+For `T`, it is self explanatory. E.g. if `T` was an `int`, that would be 4 bytes + 4 bytes padding for a standard alignment of 8 bytes. Next, since `edge_container` is a `std::vector`, it is 8 bytes (an allocator reference), and 24 bytes for another three pointers (`begin`, `end`, `capacity`)--yielding a total of 32 bytes. So in total, it will be 32 + 8 = 40 bytes.
