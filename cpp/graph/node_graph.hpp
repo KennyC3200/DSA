@@ -83,7 +83,7 @@ public:
 
     allocator_type GetAllocator() { return m_alloc; }
 
-    void PrintTo(std::ostream& os) {
+    void Print(std::ostream& os = std::cout) {
         for (size_type i = 0; i < m_size; i++) {
             os << m_data[i].Val() << ": ";
             for (auto adj : m_data[i].Edges())
