@@ -2,6 +2,7 @@
 
 #include "node.hpp"
 #include <stdexcept>
+#include <iostream>
 
 template <typename T, typename Alloc = std::allocator<T>>
 class NodeGraph {
@@ -81,6 +82,15 @@ public:
     }
 
     allocator_type GetAllocator() { return m_alloc; }
+
+    void PrintTo(std::ostream& os) {
+        for (size_type i = 0; i < m_size; i++) {
+            os << m_data[i].Val() << ": ";
+            for (auto adj : m_data[i].Edges())
+                os << m_data[adj].Val() << " ";
+            os << std::endl;
+        }
+    }
 
 private:
     void Relocate(size_type new_capacity) {
