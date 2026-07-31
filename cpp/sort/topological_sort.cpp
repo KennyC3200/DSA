@@ -4,26 +4,28 @@
 #include <queue>
 #include <utility>
 
-// TODO: What if I want to choose a different allocator than the graph's allocator?
-template <typename Graph>
+template <typename Graph, typename Alloc = std::allocator<typename Graph::value_type>>
 class TopoSort {
-private:
+public:
     using value_type = typename Graph::value_type;
     using size_type = typename Graph::size_type;
-    using allocator_type = typename Graph::allocator_type;
+    using allocator_type = Alloc;
 
+private:
     template <typename T>
-    using Alloc = typename std::allocator_traits<allocator_type>::template rebind_alloc<T>;
+    using rebind_alloc = typename std::allocator_traits<allocator_type>::template rebind_alloc<T>;
 
-    using Queue = std::queue<size_type, std::deque<size_type, Alloc<size_type>>>;
+    using Queue = std::queue<size_type, std::deque<size_type, rebind_alloc<size_type>>>;
     using Hashmap = std::unordered_map<
         value_type, size_type, std::hash<value_type>, std::equal_to<value_type>, 
-        Alloc<std::pair<const value_type, size_type>>>;
+        rebind_alloc<std::pair<const value_type, size_type>>>;
 
-    template <typename T> using List = std::vector<T, Alloc<T>>;
+    template <typename T> using List = std::vector<T, rebind_alloc<T>>;
 
 public:
-    TopoSort(Graph& graph) : m_graph(graph) , m_alloc(graph.GetAllocator()) {}
+    TopoSort(Graph& graph, Alloc alloc = std::allocator<value_type>()) 
+        : m_graph(graph) 
+        , m_alloc(alloc) {}
     ~TopoSort() = default;
 
     List<value_type> SortBFS() {
@@ -80,7 +82,7 @@ public:
     static bool Sorted(
             Graph& graph, 
             List<value_type> list, 
-            Alloc<allocator_type> alloc = std::allocator<value_type>()) 
+            Alloc alloc = std::allocator<value_type>()) 
     {
         size_type n = list.size();
         Hashmap node_positions(n, alloc);
@@ -110,43 +112,5 @@ private:
     }
 
     Graph& m_graph;
-    Alloc<allocator_type> m_alloc;
+    Alloc m_alloc;
 };
-
-constexpr std::size_t ARENA_BYTES = 2048;
-constexpr std::size_t NODES = 8;
-
-int main(void) {
-    // using NodeType = int;
-    // using Alloc = short_alloc<NodeType, ARENA_BYTES>;
-    // using Graph = NodeGraph<NodeType, Alloc>;
-    // using Topo = TopoSort<Graph>;
-
-    // Alloc::arena_type arena;
-    // Graph graph(arena);
-    using Graph = NodeGraph<int>;
-    using Topo = TopoSort<Graph>;
-    Graph graph;
-
-    for (std::size_t i = 0; i < NODES; i++) graph.AddNode(i);
-
-    graph.AddEdge(5, 0);
-    graph.AddEdge(5, 2);
-    graph.AddEdge(4, 0);
-    graph.AddEdge(4, 1);
-    graph.AddEdge(2, 3);
-    graph.AddEdge(3, 1);
-
-    Topo topo(graph);
-    graph.Print();
-
-    auto bfs = topo.SortBFS();
-    Topo::PrintList(bfs);
-    std::cout << (Topo::Sorted(graph, bfs) ? "True" : "False") << std::endl;
-
-    auto dfs = topo.SortDFS();
-    Topo::PrintList(dfs);
-    std::cout << (Topo::Sorted(graph, dfs) ? "True" : "False") << std::endl;
-
-    return 0;
-}
