@@ -2,6 +2,9 @@
 # https://youtu.be/7J3GadLzydI
 # https://leetcode.com/discuss/post/1078072/introduction-to-topological-sort-by-sinc-i0ii/
 
+from collections import deque
+import string
+
 graph = {
     'A': {'D'},
     'B': {'D'},
@@ -18,7 +21,34 @@ graph = {
     'M': {},
 }
 
-def topo_sort(graph):
+def kahn_algorithm(graph) -> list:
+    # BFS algorithm
+    indegree = {x: 0 for x in string.ascii_uppercase[:len(graph)]}
+    out = []
+    queue = deque()
+
+    # Compute indegrees
+    for node in graph:
+        for next in graph[node]:
+            indegree[next] += 1
+
+    # Append nodes with indegree 0 into the queue
+    for node in indegree:
+        if indegree[node] == 0:
+            queue.append(node)
+
+    while queue:
+        node = queue.popleft()
+        out.append(node)
+
+        for next in graph[node]:
+            indegree[next] -= 1
+            if indegree[next] == 0:
+                queue.append(next)
+
+    return out
+
+def topo_dfs(graph):
     n = len(graph)
     visited = {node: False for node in graph}
     ordering = [''] * n
@@ -39,4 +69,5 @@ def dfs(node, visited, ordering: list, ordering_idx, graph):
     ordering[ordering_idx] = node
     return ordering_idx - 1
 
-print(topo_sort(graph))
+print(topo_dfs(graph))
+print(kahn_algorithm(graph))
