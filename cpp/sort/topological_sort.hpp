@@ -65,13 +65,55 @@ public:
     List<value_type> SortDFS() {
         size_type n = m_graph.Size();
         List<value_type> list(n, m_alloc);
+
+        // TODO: maybe optimize this to be a bitmap instead to save memory
+        //       also, the std::fill is kind of unecessary tbh
         List<bool> visited(n, m_alloc);
         std::fill(visited.begin(), visited.end(), false);
+
         size_type list_idx = n - 1;
         for (size_type i = 0; i < n; i++) {
             if (!visited[i]) list_idx = DFS(i, visited, list, list_idx);
         }
         return list;
+    }
+
+    // Iterative DFS approach
+    List<value_type> SortDFSIteratively() {
+        size_type n = m_graph.Size();
+        List<value_type> ordering(n, m_alloc);
+
+        // TODO: maybe optimize this to be a bitmap instead to save memory
+        //       also, the std::fill is kind of unecessary tbh
+        List<bool> visited(n, m_alloc);
+        std::fill(visited.begin(), visited.end(), false);
+
+        size_type ordering_idx = n - 1;
+        for (size_type starting_node = 0; starting_node < n; starting_node++) {
+            if (visited[starting_node]) continue;
+
+            List<size_type> stack(m_alloc);
+            stack.reserve(n);
+            stack.push_back(starting_node);
+            while (!stack.empty()) {
+                size_type node = stack.back();
+                stack.pop_back();
+
+                if (visited[node]) {
+                    ordering[ordering_idx--] = m_graph[node].Val();
+                } else {
+                    stack.push_back(node);
+                    visited[node] = true;
+
+                    auto& edges = m_graph[node].Edges();
+                    for (size_type& adj : edges) {
+                        if (!visited[adj]) stack.push_back(adj);
+                    }
+                }
+            }
+        }
+
+        return ordering;
     }
 
     static void PrintList(List<value_type> list, std::ostream& os = std::cout) {

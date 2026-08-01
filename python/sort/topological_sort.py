@@ -69,5 +69,37 @@ def dfs(node, visited, ordering: list, ordering_idx, graph):
     ordering[ordering_idx] = node
     return ordering_idx - 1
 
+def dfs_iterative(graph):
+    # Topological sorting here requires post-order traversal
+    # This is tricky, because normally DFS with a stack is pre-order traversal
+    # So we keep track of another state, processing, and when we pop the node from the stack
+    # if it is not processing, we append the node back into the stack along with it's adjacent
+    # nodes and change the state of the parent node to processing
+    n = len(graph)
+    visited = set()
+    ordering = [''] * n 
+    order_idx = n - 1
+    for starting_node in graph:
+        if starting_node in visited:
+            continue
+
+        stack = [starting_node]
+        while stack:
+            node = stack.pop()
+
+            if node in visited:
+                ordering[order_idx] = node
+                order_idx -= 1
+            else:
+                stack.append(node)
+                visited.add(node)
+
+                for adj in graph[node]:
+                    if adj not in visited:
+                        stack.append(adj)
+
+    return ordering
+
 print(topo_dfs(graph))
 print(kahn_algorithm(graph))
+print(dfs_iterative(graph))
