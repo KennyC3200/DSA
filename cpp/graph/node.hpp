@@ -1,6 +1,6 @@
 #pragma once
 
-#include <arena_allocator/stack_arena.hpp>
+#include <vector>
 
 template <typename T, typename Alloc = std::allocator<T>>
 class Node {
