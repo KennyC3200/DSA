@@ -142,11 +142,11 @@ inline bool operator==(
 }
 
 #if (defined(_MSVC_LANG) && _MSVC_LANG < 202002L) || (!defined(_MSVC_LANG) && __cplusplus < 202002L)
-    template <class T1, std::size_t N1, std::size_t A1, class U, std::size_t M, std::size_t A2>
+template <class T1, std::size_t N1, std::size_t A1, class U, std::size_t M, std::size_t A2>
     inline bool operator!=(
         const short_alloc<T1, N1, A1>& x, 
         const short_alloc<U, M, A2>& y) noexcept 
-    {
-        return !(x == y);
-    }
+{
+    return !(x == y);
+}
 #endif

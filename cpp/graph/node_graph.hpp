@@ -36,7 +36,7 @@ public:
     NodeGraph(NodeGraph&& other) noexcept
         : m_alloc(std::move(other.m_alloc))
         , m_node_alloc(std::move(other.m_node_alloc))
-        , m_data(other.m_data) 
+        , m_data(other.m_data)
         , m_size(other.m_size)
         , m_capacity(other.m_capacity) 
     {
