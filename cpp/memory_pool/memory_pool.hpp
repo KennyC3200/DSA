@@ -3,20 +3,20 @@
 #include <cstddef>
 #include <vector>
 #include <memory>
+#include <utility>
 #include <cassert>
-#include <new>
 
-// This class actually owns the memory and the free list
-// It is untyped, and knows the SlotSize at compile time
-// MemoryPoolAlloc is the cheap handle for this
-template <
-    std::size_t SlotSize,
-    std::size_t SlotAlignment = alignof(std::max_align_t),
-    std::size_t SlotsPerBlock = 1024>
+template <typename T, std::size_t SlotsPerChunk = 1024>
 class MemoryPool {
+    // A slot either stores a T or, while free, is a link in the "free list" (containing free slots)
+    // If the slot is not occupied, it will store the next slot, effectively creating a linked list
+    // which is the free list.
+    // The union makes sizeof/alignof = max(T, pointer) so the free list costs zero extra-bytes
+    // That is, if T < sizeof(T) = 8 bytes, it will default to 8 bytes and if it is > 8 bytes, well
+    // it won't matter we will just have extra bytes lol cuz a pointer only needs 8 bytes
     union Slot {
         Slot* m_next;
-        alignas(SlotAlignment) std::byte m_storage[SlotSize];
+        alignas(T) std::byte m_storage[sizeof(T)];
     };
 
     Slot* m_free_head = nullptr;
@@ -24,15 +24,15 @@ class MemoryPool {
     std::size_t m_live = 0;
 
     void Grow() {
-        // push_back first, in the case it throws so m_free_head stays valid
-        m_blocks.push_back(std::unique_ptr<Slot[]>(new Slot[SlotsPerBlock]));
-        Slot* block = m_blocks.back().get();
+        std::unique_ptr<Slot[]> block(new Slot[SlotsPerChunk]);
 
-        // Back-to-front so allocations walk through memory
-        for (std::size_t i = SlotsPerBlock; i-- > 0;) {
+        // Back-to-front so allocations walk forward through memory
+        for (std::size_t i = SlotsPerChunk; i-- > 0;) {
             block[i].m_next = m_free_head;
             m_free_head = &block[i];
         }
+
+        m_blocks.push_back(std::move(block));
     }
 
 public:
@@ -41,95 +41,60 @@ public:
     MemoryPool& operator=(const MemoryPool&) = delete;
     ~MemoryPool() { assert(m_live == 0 && "Memory pool destroyed with live objects!"); }
 
-    template <std::size_t ReqAlignment>
-    [[nodiscard]] std::byte* allocate() {
-        static_assert(
-            ReqAlignment <= SlotAlignment, 
-            "The alignment is too large for this memory pool");
-
+    template <typename... Args>
+    T* Create(Args&&... args) {
         if (!m_free_head) Grow();
 
         // Get the slot and increment the head
         Slot* slot = m_free_head;
         m_free_head = m_free_head->m_next;
 
-        m_live++;
-        return static_cast<std::byte*>(slot->m_storage);
+        try {
+            // This is weird syntax, but basically the static_cast<void*>(slot->m_storage) 
+            // (which we'll call p) is a placement argument for the new-expression, and it calls 
+            // the following overload:
+            // void* operator new(std::size_t, void* p) noexcept { return p; }
+            // Which does not create an allocation (since m_storage already allocates) and instead
+            // constructs T at that address
+            T* obj = ::new (static_cast<void*>(slot->m_storage)) T(std::forward<Args>(args)...);
+            m_live++;
+            return obj;
+        } catch (...) {
+            // Constructor threw: give the slot back
+            slot->m_next = m_free_head;
+            m_free_head = slot;
+            throw;
+        }
     }
 
-    void deallocate(std::byte* ptr) noexcept {
-        if (!ptr) return;
+    void Destroy(T* obj) noexcept {
+        // Run the destructor and push the slot into the free list
+        if (!obj) return;
+        obj->~T();
 
-        Slot* s = reinterpret_cast<Slot*>(ptr);
+        Slot* s = reinterpret_cast<Slot*>(obj);
         s->m_next = m_free_head;
         m_free_head = s;
 
         m_live--;
     }
-};
 
-template <
-    class T, 
-    std::size_t SlotSize,
-    std::size_t SlotAlignment = alignof(std::max_align_t),
-    std::size_t SlotsPerBlock = 1024>
-class MemoryPoolAlloc {
-public:
-    using value_type = T;
-    static auto constexpr slot_size = SlotSize;
-    static auto constexpr slot_alignment = SlotAlignment;
-    static auto constexpr slots_per_block = SlotsPerBlock;
-    using memory_pool_type = MemoryPool<SlotSize, slot_alignment, slots_per_block>;
+    // unique_ptr also allows a custom deleter upon destruction
+    struct Deleter {
+        MemoryPool* m_pool;
+        void operator()(T* ptr) const noexcept { m_pool->Destroy(ptr); }
+    };
 
-    MemoryPoolAlloc(const MemoryPoolAlloc&) = default;
-    MemoryPoolAlloc& operator=(const MemoryPoolAlloc&) = delete;
+    using Handle = std::unique_ptr<T, Deleter>;
 
-    MemoryPoolAlloc(memory_pool_type& memory_pool) noexcept : m_memory_pool(memory_pool) {}
-
-    template <class U>
-    MemoryPoolAlloc(
-        const MemoryPoolAlloc<U, slot_size, slot_alignment, slots_per_block>& other) noexcept
-        : m_memory_pool(other.m_memory_pool) {}
-
-    template <class U>
-    struct rebind { using other = MemoryPoolAlloc<U, slot_size, slot_alignment, slots_per_block>; };
-
-    [[nodiscard]] T* allocate(std::size_t n) {
-        static_assert(sizeof(T) <= SlotSize, "T does not fit in a slot");
-        if (n == 1) return reinterpret_cast<T*>(m_memory_pool.template allocate<alignof(T)>());
-        throw std::bad_alloc();
+    template <typename... Args>
+    Handle Make(Args&&... args) {
+        return Handle(Create(std::forward<Args>(args)...), Deleter{this});
     }
 
-    void deallocate(T* ptr, std::size_t n) noexcept {
-        assert(n == 1);
-        m_memory_pool.deallocate(reinterpret_cast<std::byte*>(ptr));
-    }
+    std::size_t Live() const noexcept { return m_live; }
+    std::size_t Capacity() const noexcept { return m_blocks.size() * SlotsPerChunk; }
 
-    template <class T1, class T2, std::size_t N, std::size_t A, std::size_t B>
-    friend bool operator==(
-        const MemoryPoolAlloc<T1, N, A, B>& x,
-        const MemoryPoolAlloc<T2, N, A, B>& y) noexcept; 
-
-    template <class U, std::size_t N, std::size_t A, std::size_t B> friend class MemoryPoolAlloc;
-
-private:
-    memory_pool_type& m_memory_pool;
+    // Make this constexpr because Slot is determined at compile time
+    static constexpr std::size_t SlotSize() noexcept { return sizeof(Slot); }
 };
-
-template <class T1, class T2, std::size_t N, std::size_t A, std::size_t B>
-inline bool operator==(
-    const MemoryPoolAlloc<T1, N, A, B>& x,
-    const MemoryPoolAlloc<T2, N, A, B>& y) noexcept 
-{
-    return &x.m_memory_pool == &y.m_memory_pool;
-}
-
-#if (defined(_MSVC_LANG) && _MSVC_LANG < 202002L) || (!defined(_MSVC_LANG) && __cplusplus < 202002L)
-template <class T1, class T2, std::size_t N, std::size_t A, std::size_t B>
-inline bool operator!=(
-    const MemoryPoolAlloc<T1, N, A, B>& x,
-    const MemoryPoolAlloc<T2, N, A, B>& y) noexcept 
-{
-    return !(x == y);
-}
-#endif
