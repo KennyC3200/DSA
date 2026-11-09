@@ -93,6 +93,11 @@ public:
         }
     }
 
+    void PopNode() {
+        if (m_size == 0) throw std::out_of_range("PopNode on empty NodeGraph");
+        node_alloc_traits::destroy(m_node_alloc, m_data + --m_size);
+    }
+
 private:
     void Relocate(size_type new_capacity) {
         // Allocate new chunk of memory and move the nodes over

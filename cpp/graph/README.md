@@ -1,5 +1,5 @@
-# Graph
-This implementation utilizes two classes: `Node` and `TreeNode`. It also utilizes allocators which you can specify, defaulting to `std::allocator<T>`.
+# Node Graph
+This implementation utilizes the `Node` class and allocators which you can specify, defaulting to `std::allocator<T>`. The implementation is [here](node_graph.hpp).
 
 The `edge`'s value is the index of the corresponding node in the `NodeGraph` nodes array.
 
@@ -67,3 +67,6 @@ T m_val;
 edge_container m_edges;
 ```
 For `T`, it is self explanatory. E.g. if `T` was an `int`, that would be 4 bytes + 4 bytes padding for a standard alignment of 8 bytes. Next, since `edge_container` is a `std::vector`, it is 8 bytes (an allocator reference), and 24 bytes for another three pointers (`begin`, `end`, `capacity`)--yielding a total of 32 bytes. So in total, it will be 32 + 8 = 40 bytes.
+
+# Node Graph Container
+A node-based container that encapsulates dynamic size graphs. This container wraps the `NodeGraph` class and follows the guidlines of C++ STL's containers. The implementation is [here](node_graph_container.hpp).

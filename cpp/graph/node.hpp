@@ -9,9 +9,11 @@ public:
     using allocator_type = Alloc;
     using size_type = std::size_t;
 
+private:
     using edge_alloc = typename std::allocator_traits<Alloc>::template rebind_alloc<size_type>;
     using edge_container = std::vector<size_type, edge_alloc>;
 
+public:
     template <typename... Args>
     explicit Node(const Alloc& alloc, Args&&... args)
         : m_val(std::forward<Args>(args)...)
