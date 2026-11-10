@@ -6,8 +6,8 @@
 #include <type_traits>
 #include <cstddef>
 
-template <typename T, typename Alloc = std::allocator<T>>
-class NodeGraphContainer {
+template <typename T, typename Alloc = std::allocator<T>, std::size_t Arity = 2>
+class CompleteTree {
 public:
     using graph_type = NodeGraph<T, Alloc>;
     using value_type = T;
@@ -94,7 +94,7 @@ public:
     using iterator = basic_iterator<false>;
     using const_iterator = basic_iterator<true>;
 
-    explicit NodeGraphContainer(const Alloc& alloc = Alloc()): m_graph(alloc) {}
+    explicit CompleteTree(const Alloc& alloc = Alloc()): m_graph(alloc) {}
 
     reference operator[](size_type pos) { return m_graph[pos].Val(); }
     const_reference operator[](size_type pos) const { return m_graph[pos].Val(); }
@@ -133,11 +133,11 @@ public:
 
 private:
     static size_type parent_idx(size_type child_idx) {
-        return (child_idx - 1) / 2;
+        return (child_idx - 1) / Arity;
     }
 
     graph_type m_graph;
 };
 
-static_assert(std::random_access_iterator<NodeGraphContainer<int>::iterator>);
-static_assert(std::random_access_iterator<NodeGraphContainer<int>::const_iterator>);
+static_assert(std::random_access_iterator<CompleteTree<int>::iterator>);
+static_assert(std::random_access_iterator<CompleteTree<int>::const_iterator>);
