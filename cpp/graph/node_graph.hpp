@@ -98,6 +98,9 @@ public:
         node_alloc_traits::destroy(m_node_alloc, m_data + --m_size);
     }
 
+    node_type* Data() noexcept { return m_data; }
+    const node_type* Data() const noexcept { return m_data; }
+
 private:
     void Relocate(size_type new_capacity) {
         // Allocate new chunk of memory and move the nodes over

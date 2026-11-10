@@ -27,6 +27,8 @@ int main(void) {
     return 0;
 }
 ```
+See [this example](example1.cpp).
+
 And if you were to say use a custom [Stack Arena](../arena_allocator/README.md)
 ```cpp
 constexpr std::size_t ARENA_BYTES = 1024;
@@ -59,6 +61,7 @@ int main(void) {
     return 0;
 }
 ```
+See [this example](example2.cpp).
 
 ## Node Class
 The node class itself uses `32 + sizeof(T) + padding(T)` bytes:
