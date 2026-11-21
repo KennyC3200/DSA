@@ -19,6 +19,7 @@ public:
 private:
     using node_type = typename graph_type::node_type;
 
+    // basic_iterator for the CompleteTree class
     template <bool IsConst>
     class basic_iterator {
         using node_ptr = std::conditional_t<IsConst, const node_type*, node_type*>;
@@ -41,7 +42,9 @@ private:
 
         [[nodiscard]] reference operator*() const noexcept { return m_ptr->Val(); }
         [[nodiscard]] pointer operator->() const noexcept { return std::addressof(m_ptr->Val()); }
-        [[nodiscard]] reference operator[](difference_type offset) const noexcept { return m_ptr[offset].Val(); }
+        [[nodiscard]] reference operator[](difference_type offset) const noexcept { 
+            return m_ptr[offset].Val(); 
+        }
 
         basic_iterator& operator++() noexcept { ++m_ptr; return *this; }
         basic_iterator operator++(int) noexcept { auto tmp = *this; ++*this; return tmp; }
@@ -139,5 +142,19 @@ private:
     graph_type m_graph;
 };
 
+// Ensure the iterator and const_iterator follow the random_access_iterator guidelines for basic int
 static_assert(std::random_access_iterator<CompleteTree<int>::iterator>);
 static_assert(std::random_access_iterator<CompleteTree<int>::const_iterator>);
+
+// Primary template: it is not a complete tree
+template <typename Container>
+struct is_complete_tree : std::false_type {};
+
+// Partial specialization: it is a complete tree
+template <typename T, typename Alloc, std::size_t Arity>
+struct is_complete_tree<CompleteTree<T, Alloc, Arity>> : std::true_type {
+    static constexpr std::size_t arity = Arity;
+};
+
+template <typename Container>
+inline constexpr bool is_complete_tree_v = is_complete_tree<Container>::value;

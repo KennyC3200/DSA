@@ -45,6 +45,17 @@ public:
         other.m_capacity = 0;
     }
 
+    NodeGraph& operator=(NodeGraph&& other) noexcept {
+        if (this != other) {
+            std::swap(m_alloc, other.m_alloc);
+            std::swap(m_node_alloc, other.m_node_alloc);
+            std::swap(m_data, other.m_data);
+            std::swap(m_size, other.m_size);
+            std::swap(m_capacity, other.m_capacity);
+        }
+        return *this;
+    }
+
     template <typename... Args>
     size_type AddNode(Args&&... args) {
         // Check current size to max capacity
@@ -131,8 +142,8 @@ private:
             throw std::out_of_range("node_graph index out of range");
     }
 
-    allocator_type m_alloc;  // Original allocator, needed for rebinding when allocating the edges
-    node_alloc m_node_alloc; // Allocator for node
+    allocator_type m_alloc;     // Original allocator, needed for rebinding when allocating the edges
+    node_alloc m_node_alloc;    // Allocator for nodes
     node_type* m_data = nullptr;
     size_type m_size = 0;
     size_type m_capacity = 0;
