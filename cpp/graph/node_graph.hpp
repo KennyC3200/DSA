@@ -7,14 +7,22 @@
 #include <iterator>
 #include <cassert>
 #include <utility>
+#include <algorithm>
 
-template <typename T, typename Alloc = std::allocator<T>>
+enum class GraphEdgeDir { Directed, Undirected };
+
+template <
+    typename T,
+    GraphEdgeDir EdgeDir = GraphEdgeDir::Directed,
+    typename Alloc = std::allocator<T>>
 class NodeGraph {
 public:
     using value_type        = T;
     using allocator_type    = Alloc;
     using node_type         = Node<T, Alloc>;
     using size_type         = std::size_t;
+
+    static constexpr bool directed = EdgeDir == GraphEdgeDir::Directed;
 
 private:
     using node_alloc        = typename std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
@@ -143,10 +151,12 @@ public:
         return m_size++;
     }
 
-    void AddEdge(size_type from, size_type to) {
-        CheckIndex(from);
-        CheckIndex(to);
-        m_data[from].Edges().push_back(to);
+    // If directed, a -> b else a <-> b
+    void AddEdge(size_type a, size_type b) {
+        CheckIndex(a);
+        CheckIndex(b);
+        m_data[a].Edges().push_back(b);
+        if constexpr (!directed) m_data[b].Edges().push_back(a);
     }
 
     node_type& operator[](size_type i) { return m_data[i]; }
@@ -169,17 +179,30 @@ public:
     void Print(std::ostream& os = std::cout) const {
         for (size_type i = 0; i < m_size; i++) {
             os << m_data[i].Val() << ": ";
-            for (auto adj : m_data[i].Edges())
+            for (size_type adj : m_data[i].Edges())
                 os << m_data[adj].Val() << " ";
             os << std::endl;
         }
     }
 
-    // TODO For removing nodes, we currently only have removing the last appended node,
-    //      which is dumb lol
-    void PopNode() {
-        if (m_size == 0) throw std::out_of_range("PopNode on empty NodeGraph");
-        node_alloc_traits::destroy(m_node_alloc, m_data + --m_size);
+    void RemoveNode(size_type node) {
+        CheckIndex(node);
+
+        // Destroy the node at i and shift the remaining nodes to fill the tombstone
+        std::move(m_data + node + 1, m_data + m_size, m_data + node);
+        node_alloc_traits::destroy(m_node_alloc, m_data + m_size - 1);
+        --m_size;
+
+        // Update values in edge list
+        for (size_type i = 0; i < m_size; i++) {
+            auto& edges = m_data[i].Edges();
+            auto keep = edges.begin();
+            for (size_type e : edges) {
+                if (e == node) continue;
+                *keep++ = e > node ? e - 1 : e;
+            }
+            edges.erase(keep, edges.end());
+        }
     }
 
     node_type* Data() noexcept { return m_data; }
@@ -236,6 +259,7 @@ private:
         // Allocate new chunk of memory and move the nodes over
         node_type* new_data = node_alloc_traits::allocate(m_node_alloc, new_capacity);
         size_type cnt = 0;
+        bool emplaced_node = false; // Catch memory leak if the emplaced node throws
         try {
             // Need to build the new node first due to edge case: e.g. AddNode(graph[0].Val())
             // Because the new buffer is moving the elements from the previous buffer, the previous
@@ -245,10 +269,12 @@ private:
                 node_alloc_traits::construct(
                     m_node_alloc, new_data + m_size,
                     GetAllocator(), std::forward<Args>(args)...);
+                emplaced_node = true;
             }
             for (; cnt < m_size; cnt++)
                 node_alloc_traits::construct(m_node_alloc, new_data + cnt, std::move(m_data[cnt]));
         } catch (...) {
+            if (emplaced_node) node_alloc_traits::destroy(m_node_alloc, new_data + m_size);
             for (size_type i = 0; i < cnt; i++)
                 node_alloc_traits::destroy(m_node_alloc, new_data + i);
             node_alloc_traits::deallocate(m_node_alloc, new_data, new_capacity);
@@ -277,3 +303,9 @@ private:
     size_type m_size = 0;
     size_type m_capacity = 0;
 };
+
+template <typename T, typename Alloc = std::allocator<T>>
+using DirectedGraph = NodeGraph<T, GraphEdgeDir::Directed, Alloc>;
+
+template <typename T, typename Alloc = std::allocator<T>>
+using UndirectedGraph = NodeGraph<T, GraphEdgeDir::Undirected, Alloc>;
