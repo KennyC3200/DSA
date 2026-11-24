@@ -6,8 +6,9 @@ The `edge`'s value is the index of the corresponding node in the `NodeGraph` nod
 ## Usage
 The most [basic usage](example1.cpp) with the default allocator which uses new/delete on the heap
 ```cpp
-int main(void) {
+int main() {
     NodeGraph<int> graph;
+
     auto a = graph.AddNode(1);
     auto b = graph.AddNode(2);
     auto c = graph.AddNode(3);
@@ -15,37 +16,31 @@ int main(void) {
     graph.AddEdge(a, b);
     graph.AddEdge(a, c);
     graph.AddEdge(b, c);
-
-    for (std::size_t i = 0; i < graph.Size(); i++) {
-        std::cout << graph[i].Val() << " -> ";
-        for (auto adj : graph[i].Edges()) {
-            std::cout << graph[adj].Val() << " ";
-        }
-        std::cout << '\n';
-    }
-
-    return 0;
+    graph.Print();
 }
 ```
+
 Producing the following output
 ```
-1 -> 2 3 
-2 -> 3 
-3 ->
+1: 2 3 
+2: 3 
+3:
 ```
 
 And if you were to say use a custom [stack arena](../arena_allocator/README.md)
 ```cpp
 constexpr std::size_t ARENA_BYTES = 1024;
-constexpr std::size_t NODE_CNT = 8;
+constexpr std::size_t NODES_CNT = 8;
 
-template <typename T, std::size_t BufferSize = ARENA_BYTES>
-using MyGraph = NodeGraph<T, short_alloc<T, BufferSize>>;
+template <class T, std::size_t BUFFER_SIZE = ARENA_BYTES>
+using Graph = UndirectedGraph<T, short_alloc<T, BUFFER_SIZE>>;
 
-int main(void) {
-    MyGraph<int>::allocator_type::arena_type arena;
-    MyGraph<int> graph(arena);
-    graph.Reserve(NODE_CNT);
+using MyGraph = Graph<int>;
+
+int main() {
+    MyGraph::allocator_type::arena_type arena;
+    MyGraph graph(arena);
+    graph.Reserve(NODES_CNT);
 
     auto a = graph.AddNode(1);
     auto b = graph.AddNode(2);
@@ -54,23 +49,15 @@ int main(void) {
     graph.AddEdge(a, b);
     graph.AddEdge(a, c);
     graph.AddEdge(b, c);
-
-    for (std::size_t i = 0; i < graph.Size(); i++) {
-        std::cout << graph[i].Val() << " -> ";
-        for (auto adj : graph[i].Edges()) {
-            std::cout << graph[adj].Val() << " ";
-        }
-        std::cout << '\n';
-    }
-
-    return 0;
+    graph.Print();
 }
 ```
+
 Producing the following output
 ```
-1 -> 2 3 
-2 -> 3 
-3 -> 
+1: 2 3
+2: 1 3
+3: 1 2
 ```
 The souce code for this example is [here](example2.cpp).
 
@@ -96,9 +83,6 @@ template <class T, std::size_t BufferSize = arena_bytes>
 using Tree = CompleteTree<T, short_alloc<T, BufferSize>, 2>;
 using BinaryTree = Tree<int>;
 
-template <class T, class Alloc, std::size_t Arity>
-void PrintTree(/* params */) { /* impl */ }
-
 int main() {
     BinaryTree::allocator_type::arena_type arena;
     BinaryTree tree(arena);
@@ -115,10 +99,10 @@ int main() {
     tree.push_back(9);
     tree.push_back(10);
     tree.push_back(11);
-
-    PrintTree<int, BinaryTree::allocator_type, 2> (tree);
+    tree.Print();
 }
 ```
+
 Producing the following output
 ```
 0

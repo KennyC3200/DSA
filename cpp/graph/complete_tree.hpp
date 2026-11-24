@@ -5,6 +5,9 @@
 #include <iterator>
 #include <type_traits>
 #include <cstddef>
+#include <algorithm>
+#include <iostream>
+#include <string>
 
 template <typename T, typename Alloc = std::allocator<T>, std::size_t Arity = 2>
 class CompleteTree {
@@ -134,6 +137,10 @@ public:
         m_graph.PopLast();
     }
 
+    void Print(std::ostream& os = std::cout) const {
+        PrintNode(os, 0, "", true);
+    }
+
     [[nodiscard]] iterator begin() noexcept { return iterator(m_graph.Data()); }
     [[nodiscard]] iterator end() noexcept { return iterator(m_graph.Data() + size()); }
     [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(m_graph.Data()); }
@@ -144,6 +151,22 @@ public:
     [[nodiscard]] const_iterator cend() const noexcept { return end(); }
 
 private:
+    // Prints node i, then recurses into its children. `prefix` holds the vertical bars
+    // inherited from ancestors, and `last` says whether i is its parent's last child
+    void PrintNode(std::ostream& os, size_type i, const std::string& prefix, bool last) const {
+        if (i >= size()) return;
+
+        os << prefix;
+        if (i != 0) os << (last ? "`-- " : "|-- ");
+        os << (*this)[i] << '\n';
+
+        const std::string child_prefix = prefix + (i == 0 ? "" : (last ? "    " : "|   "));
+        const size_type first = Arity * i + 1;
+        const size_type end = std::min(first + Arity, size());
+        for (size_type c = first; c < end; ++c)
+            PrintNode(os, c, child_prefix, c + 1 == end);
+    }
+
     static size_type parent_idx(size_type child_idx) {
         return (child_idx - 1) / Arity;
     }
