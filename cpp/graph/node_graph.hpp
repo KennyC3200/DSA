@@ -30,7 +30,7 @@ private:
     static constexpr bool pocma = node_alloc_traits::propagate_on_container_move_assignment::value;
 
     // If false and the allocators differ, the behaviour is undefined
-    static constexpr bool pocs  = node_alloc_traits::propagate_on_container_swap::value;
+    static constexpr bool pocs = node_alloc_traits::propagate_on_container_swap::value;
 
     static constexpr bool always_equal = node_alloc_traits::is_always_equal::value;
 
@@ -42,17 +42,36 @@ public:
         DestroyAndFree();
     }
 
-    // Ask the source which allocator a copy gets
+    // Copy the source graph `other` into the source's arena
     NodeGraph(const NodeGraph& other, const Alloc& alloc)
         : m_node_alloc(alloc) { CreateFrom(other); }
 
-    // Copy the source graph `other` into the source's arena
+    // Ask the source which allocator a copy gets
     NodeGraph(const NodeGraph& other)
         : NodeGraph(
             other,
             alloc_traits::select_on_container_copy_construction(other.GetAllocator())) {}
 
     NodeGraph& operator=(const NodeGraph& other) {
+        // STL containers like std::vector do something different--namely if *this has sufficient
+        // capacity they will assign element by element into its existing buffer. Issue with this
+        // is if an element throws mid copy, the vector ends up partly overwritten
+        // Instead what we do is copy into a tmp instead which is simpler and fully safe
+
+        if (this == &other) return *this;
+
+        // Build the result first in case it throws so *this is not impacted
+        NodeGraph tmp(other, pocca ? other.m_node_alloc : m_node_alloc);
+
+        // Free previous memory with old allocator
+        DestroyAndFree();
+
+        // If POCCA, then switch allocators
+        if constexpr (pocca) m_node_alloc = other.m_node_alloc;
+
+        // Since tmp's allocator is *this's allocator, stealing storage from it is allowed
+        StealStorage(tmp);
+        return *this;
     }
 
     // Allocator travels with the buffer
@@ -67,18 +86,47 @@ public:
         if (m_node_alloc == other.m_node_alloc) {
             StealStorage(other);
         } else {
-            CreateFrom(other);
+            CreateFrom(std::move(other));
         }
     }
 
-    NodeGraph& operator=(NodeGraph&& other) noexcept {
-        if (this != &other) {
-            std::swap(m_node_alloc, other.m_node_alloc);
-            std::swap(m_data, other.m_data);
-            std::swap(m_size, other.m_size);
-            std::swap(m_capacity, other.m_capacity);
+    // pocma    always_equal    path taken                              can throw
+    // ---------------------------------------------------------------------------
+    // true     true/false      take other's allocator, steal buffer    no
+    // false    true            steal buffer                            no
+    // false    false           steal directly if allocators equal      yes
+    //                          else create tmp and steal from tmp
+    NodeGraph& operator=(NodeGraph&& other) noexcept(always_equal || pocma) {
+        if (this == &other) return *this;
+        if constexpr (pocma) {
+            DestroyAndFree();
+            m_node_alloc = other.m_node_alloc;
+            StealStorage(other);
+        } else if (m_node_alloc == other.m_node_alloc) {
+            DestroyAndFree();
+            StealStorage(other);
+        } else {
+            NodeGraph tmp(std::move(other), m_node_alloc);
+            DestroyAndFree();
+            StealStorage(tmp);
         }
         return *this;
+    }
+
+    void swap(NodeGraph& other) noexcept {
+        if constexpr (pocs) {
+            using std::swap;
+            swap(m_node_alloc, other.m_node_alloc);
+        } else {
+            assert(m_node_alloc == other.m_node_alloc);
+        }
+        std::swap(m_data, other.m_data);
+        std::swap(m_size, other.m_size);
+        std::swap(m_capacity, other.m_capacity);
+    }
+
+    friend void swap(NodeGraph& x, NodeGraph& y) noexcept {
+        x.swap(y);
     }
 
     template <typename... Args>
@@ -113,13 +161,12 @@ public:
 
     // Allocates memory for `capacity` nodes but no nodes have been constructed yet
     void Reserve(size_type capacity) {
-        if (capacity > m_capacity)
-            Relocate(capacity);
+        if (capacity > m_capacity) Relocate(capacity);
     }
 
     allocator_type GetAllocator() const noexcept { return allocator_type(m_node_alloc); }
 
-    void Print(std::ostream& os = std::cout) {
+    void Print(std::ostream& os = std::cout) const {
         for (size_type i = 0; i < m_size; i++) {
             os << m_data[i].Val() << ": ";
             for (auto adj : m_data[i].Edges())
@@ -128,6 +175,8 @@ public:
         }
     }
 
+    // TODO For removing nodes, we currently only have removing the last appended node,
+    //      which is dumb lol
     void PopNode() {
         if (m_size == 0) throw std::out_of_range("PopNode on empty NodeGraph");
         node_alloc_traits::destroy(m_node_alloc, m_data + --m_size);
@@ -188,13 +237,17 @@ private:
         node_type* new_data = node_alloc_traits::allocate(m_node_alloc, new_capacity);
         size_type cnt = 0;
         try {
-            for (; cnt < m_size; cnt++)
-                node_alloc_traits::construct(m_node_alloc, new_data + cnt, std::move(m_data[cnt]));
+            // Need to build the new node first due to edge case: e.g. AddNode(graph[0].Val())
+            // Because the new buffer is moving the elements from the previous buffer, the previous
+            // buffer will be empty, so trying to construct graph[0].Val() after the fact will
+            // construct an empty element
             if constexpr (Emplace) {
                 node_alloc_traits::construct(
-                    m_node_alloc, m_data + m_size,
+                    m_node_alloc, new_data + m_size,
                     GetAllocator(), std::forward<Args>(args)...);
             }
+            for (; cnt < m_size; cnt++)
+                node_alloc_traits::construct(m_node_alloc, new_data + cnt, std::move(m_data[cnt]));
         } catch (...) {
             for (size_type i = 0; i < cnt; i++)
                 node_alloc_traits::destroy(m_node_alloc, new_data + i);

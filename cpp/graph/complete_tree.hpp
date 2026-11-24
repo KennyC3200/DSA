@@ -42,8 +42,8 @@ private:
 
         [[nodiscard]] reference operator*() const noexcept { return m_ptr->Val(); }
         [[nodiscard]] pointer operator->() const noexcept { return std::addressof(m_ptr->Val()); }
-        [[nodiscard]] reference operator[](difference_type offset) const noexcept { 
-            return m_ptr[offset].Val(); 
+        [[nodiscard]] reference operator[](difference_type offset) const noexcept {
+            return m_ptr[offset].Val();
         }
 
         basic_iterator& operator++() noexcept { ++m_ptr; return *this; }
@@ -52,43 +52,43 @@ private:
         basic_iterator& operator--() noexcept { --m_ptr; return *this; }
         basic_iterator operator--(int) noexcept { auto tmp = *this; --*this; return tmp; }
 
-        basic_iterator& operator+=(const difference_type offset) noexcept { 
-            m_ptr += offset; 
-            return *this; 
+        basic_iterator& operator+=(const difference_type offset) noexcept {
+            m_ptr += offset;
+            return *this;
         }
 
-        basic_iterator& operator-=(const difference_type offset) noexcept { 
-            m_ptr -= offset; 
-            return *this; 
+        basic_iterator& operator-=(const difference_type offset) noexcept {
+            m_ptr -= offset;
+            return *this;
         }
 
-        [[nodiscard]] basic_iterator operator+(const difference_type offset) const noexcept { 
-            auto tmp = *this; 
-            tmp += offset; 
+        [[nodiscard]] basic_iterator operator+(const difference_type offset) const noexcept {
+            auto tmp = *this;
+            tmp += offset;
             return tmp;
         }
 
         [[nodiscard]] friend basic_iterator operator+(
-            difference_type offset, basic_iterator it) noexcept 
+            difference_type offset, basic_iterator it) noexcept
         {
             return it += offset;
         }
 
-        [[nodiscard]] basic_iterator operator-(const difference_type offset) const noexcept { 
-            auto tmp = *this; 
-            tmp -= offset; 
+        [[nodiscard]] basic_iterator operator-(const difference_type offset) const noexcept {
+            auto tmp = *this;
+            tmp -= offset;
             return tmp;
         }
 
         friend difference_type operator-(
-            const basic_iterator& a, const basic_iterator& b) noexcept 
+            const basic_iterator& a, const basic_iterator& b) noexcept
         {
             return a.m_ptr - b.m_ptr;
         }
 
         bool operator==(const basic_iterator& a) const noexcept = default;
         auto operator<=>(const basic_iterator& a) const noexcept = default;
-    
+
     private:
         node_ptr m_ptr = nullptr;
     };
@@ -128,8 +128,8 @@ public:
     [[nodiscard]] iterator begin() noexcept { return iterator(m_graph.Data()); }
     [[nodiscard]] iterator end() noexcept { return iterator(m_graph.Data() + size()); }
     [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(m_graph.Data()); }
-    [[nodiscard]] const_iterator end() const noexcept { 
-        return const_iterator(m_graph.Data() + size()); 
+    [[nodiscard]] const_iterator end() const noexcept {
+        return const_iterator(m_graph.Data() + size());
     }
     [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
     [[nodiscard]] const_iterator cend() const noexcept { return end(); }
