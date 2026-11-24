@@ -9,12 +9,12 @@
 template <typename T, typename Alloc = std::allocator<T>, std::size_t Arity = 2>
 class CompleteTree {
 public:
-    using graph_type = NodeGraph<T, Alloc>;
-    using value_type = T;
-    using size_type = typename graph_type::size_type;
-    using reference = T&;
-    using const_reference = const T&;
-    using allocator_type = Alloc;
+    using graph_type        = NodeGraph<T, Alloc>;
+    using value_type        = T;
+    using size_type         = typename graph_type::size_type;
+    using reference         = T&;
+    using const_reference   = const T&;
+    using allocator_type    = Alloc;
 
 private:
     using node_type = typename graph_type::node_type;

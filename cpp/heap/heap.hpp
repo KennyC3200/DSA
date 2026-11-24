@@ -1,8 +1,10 @@
 #pragma once
 
+#include <stdexcept>
 #include <vector>
 #include <functional>
 #include <type_traits>
+#include <utility>
 #include "../graph/complete_tree.hpp"
 
 template <typename Container>
@@ -19,28 +21,118 @@ template <
     std::size_t Arity = container_arity<Container>::value>
 class Heap {
     static_assert(std::is_same_v<T, typename Container::value_type>);
-    static_assert(Arity >= 2, "Heap arity musst be at least 2");
+    static_assert(Arity >= 2, "Heap arity must be at least 2");
     static_assert(!is_complete_tree_v<Container> || container_arity<Container>::value == Arity,
         "Heap Arity must match the CompleteTree's Arity");
 
 public:
+    using container_type    = Container;
+    using value_compare     = Compare;
+    using value_type        = typename Container::value_type;
+    using size_type         = typename Container::size_type;
+    using reference         = typename Container::reference;
+    using const_reference   = typename Container::const_reference;
+
     static constexpr std::size_t arity = Arity;
 
     Heap() = default;
-    explicit Heap(const Compare& comp, Container c = Container());
+    explicit Heap(const Compare& comp, Container container = Container())
+        : m_container(std::move(container)), m_comp(comp) 
+    {
+        const size_type n = size();
+        if (n < 2) return;
 
-    // Indices for a node at index idx:
-    // parent = (idx - 1) / 2
-    // left   = idx * 2 + 1
-    // right  = idx * 2 + 2
+        for (size_type i = parent_idx(n - 1) + 1; i-- > 0;) {
+            sift_down(i);
+        }
+    }
 
-    // Insertion:
-    // Insert element at very end, and then bubble it up until root
+    size_type size() const noexcept {
+        return m_container.size();
+    }
 
-    // Removal:
-    // Remove top element, then move last element to the top and bubble it down until leaf
+    bool empty() const noexcept {
+        return size() == 0;
+    }
+
+    const_reference top() const {
+        if (m_container.size() < 1) {
+            throw std::out_of_range("Heap is empty, cannot get top element");
+        }
+        return m_container[0];
+    }
+
+    // Insert element at very end, sift up from i = size() - 1
+    void push(const value_type& value) {
+        m_container.push_back(value);
+        sift_up(size() - 1);
+    }
+
+    void push(value_type&& value) {
+        m_container.push_back(std::move(value));
+        sift_up(size() - 1);
+    }
+
+    template <typename... Args>
+    void emplace(Args&&... args) {
+        m_container.emplace_back(std::forward<Args>(args)...);
+        sift_up(size() - 1);
+    }
+
+    // Remove top element and replace it with last element, then sift down from i = 0
+    void pop() {
+        size_type n = size();
+        if (n == 0) throw std::out_of_range("Cannot pop() on empty heap");
+
+        using std::swap;
+        if (n > 1) swap(m_container[0], m_container[n - 1]);
+        m_container.pop_back();
+        if (n > 1) sift_down(0);
+    }
 
 private:
     Container m_container;
     Compare m_comp;
+
+    // Indices for a node at index idx:
+    // parent = (idx - 1) / Arity
+    // 0 = idx * Arity + 1
+    // 1 = idx * Arity + 2
+    // ...
+    // Arity - 1 = idx * Arity + Arity
+
+    // Caller needs to guarantee that i > 0
+    static constexpr size_type parent_idx(size_type i) noexcept {
+        return (i - 1) / arity;
+    }
+
+    // k in [0, arity)
+    static constexpr size_type child_idx(size_type i, size_type k) noexcept {
+        return i * arity + k + 1;
+    }
+
+    void sift_up(size_type i) {
+        using std::swap;
+        while (i > 0) {
+            size_type parent = parent_idx(i);
+            if (!m_comp(m_container[parent], m_container[i])) break;
+            swap(m_container[parent], m_container[i]);
+            i = parent;
+        }
+    }
+
+    void sift_down(size_type i) {
+        using std::swap;
+        const size_type n = size();
+        while (true) {
+            size_type best = i;
+            size_type first = child_idx(i, 0);
+            for (size_type child = first; child < first + arity && child < n; child++) {
+                if (m_comp(m_container[best], m_container[child])) best = child;
+            }
+            if (best == i) break;
+            swap(m_container[i], m_container[best]);
+            i = best;
+        }
+    }
 };

@@ -8,14 +8,15 @@
 template <typename T, typename Alloc = std::allocator<T>>
 class NodeGraph {
 public:
-    using value_type = T;
-    using allocator_type = Alloc;
-    using node_type = Node<T, Alloc>;
-    using size_type = std::size_t;
+    using value_type        = T;
+    using allocator_type    = Alloc;
+    using node_type         = Node<T, Alloc>;
+    using size_type         = std::size_t;
 
 private:
-    using node_alloc = typename std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
+    using node_alloc        = typename std::allocator_traits<Alloc>::template rebind_alloc<node_type>;
     using node_alloc_traits = std::allocator_traits<node_alloc>;
+    using alloc_traits      = std::allocator_traits<Alloc>;
 
 public:
     explicit NodeGraph(const Alloc& alloc = Alloc()) 
@@ -23,11 +24,7 @@ public:
         , m_node_alloc(alloc) {}
 
     ~NodeGraph() {
-        // Deconstruct all nodes and then deallocate the memory
-        for (size_type i = 0; i < m_size; i++)
-            node_alloc_traits::destroy(m_node_alloc, m_data + i);
-        if (m_data) node_alloc_traits::deallocate(m_node_alloc, m_data, m_capacity);
-        m_size = 0;
+        DestroyAndFree();
     }
 
     NodeGraph(const NodeGraph&) = delete;
@@ -46,7 +43,7 @@ public:
     }
 
     NodeGraph& operator=(NodeGraph&& other) noexcept {
-        if (this != other) {
+        if (this != &other) {
             std::swap(m_alloc, other.m_alloc);
             std::swap(m_node_alloc, other.m_node_alloc);
             std::swap(m_data, other.m_data);
@@ -113,6 +110,16 @@ public:
     const node_type* Data() const noexcept { return m_data; }
 
 private:
+    void DestroyAndFree() noexcept {
+        // Deconstruct all nodes and then deallocate the memory
+        for (size_type i = 0; i < m_size; i++)
+            node_alloc_traits::destroy(m_node_alloc, m_data + i);
+        if (m_data) node_alloc_traits::deallocate(m_node_alloc, m_data, m_capacity);
+        m_data = nullptr;
+        m_size = 0;
+        m_capacity = 0;
+    }
+
     void Relocate(size_type new_capacity) {
         // Allocate new chunk of memory and move the nodes over
         node_type* new_data = node_alloc_traits::allocate(m_node_alloc, new_capacity);
