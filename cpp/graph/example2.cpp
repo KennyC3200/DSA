@@ -7,7 +7,7 @@ constexpr std::size_t ARENA_BYTES = 1024;
 constexpr std::size_t NODES_CNT = 8;
 
 template <class T, std::size_t BUFFER_SIZE = ARENA_BYTES>
-using Graph = NodeGraph<T, short_alloc<T, BUFFER_SIZE>>;
+using Graph = UndirectedGraph<T, short_alloc<T, BUFFER_SIZE>>;
 
 using MyGraph = Graph<int>;
 
@@ -23,12 +23,5 @@ int main() {
     graph.AddEdge(a, b);
     graph.AddEdge(a, c);
     graph.AddEdge(b, c);
-
-    for (std::size_t i = 0; i < graph.Size(); i++) {
-        std::cout << graph[i].Val() << " -> ";
-        for (auto adj : graph[i].Edges()) {
-            std::cout << graph[adj].Val() << " ";
-        }
-        std::cout << '\n';
-    }
+    graph.Print();
 }

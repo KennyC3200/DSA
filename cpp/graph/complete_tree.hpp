@@ -9,7 +9,7 @@
 template <typename T, typename Alloc = std::allocator<T>, std::size_t Arity = 2>
 class CompleteTree {
 public:
-    using graph_type        = NodeGraph<T, Alloc>;
+    using graph_type        = DirectedGraph<T, Alloc>;
     using value_type        = T;
     using size_type         = typename graph_type::size_type;
     using reference         = T&;
@@ -115,14 +115,23 @@ public:
     template <class... Args>
     reference emplace_back(Args&&... args) {
         size_type idx = m_graph.AddNode(std::forward<Args>(args)...);
-        if (idx > 0) m_graph.AddEdge(parent_idx(idx), idx);
+        if (idx > 0) {
+            try {
+                m_graph.AddEdge(parent_idx(idx), idx);
+            } catch (...) {
+                m_graph.PopLast();
+                throw;
+            }
+        }
         return m_graph[idx].Val();
     }
 
     void pop_back() {
-        size_type idx = m_graph.Size() - 1;
+        const size_type size = m_graph.Size();
+        if (size == 0) return;
+        size_type idx = size - 1;
         if (idx > 0) m_graph[parent_idx(idx)].Edges().pop_back(); // pop_back() removes last child
-        m_graph.PopNode();
+        m_graph.PopLast();
     }
 
     [[nodiscard]] iterator begin() noexcept { return iterator(m_graph.Data()); }

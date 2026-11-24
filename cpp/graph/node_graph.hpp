@@ -50,7 +50,7 @@ public:
         DestroyAndFree();
     }
 
-    // Copy the source graph `other` into the source's arena
+    // Copy the source graph `other` into alloc
     NodeGraph(const NodeGraph& other, const Alloc& alloc)
         : m_node_alloc(alloc) { CreateFrom(other); }
 
@@ -188,7 +188,7 @@ public:
     void RemoveNode(size_type node) {
         CheckIndex(node);
 
-        // Destroy the node at i and shift the remaining nodes to fill the tombstone
+        // Overwrite `node` by shifting later nodes left, then destroy the leftover last slot
         std::move(m_data + node + 1, m_data + m_size, m_data + node);
         node_alloc_traits::destroy(m_node_alloc, m_data + m_size - 1);
         --m_size;
@@ -209,6 +209,15 @@ public:
     const node_type* Data() const noexcept { return m_data; }
 
 private:
+    // Is also used after conversion back to allocator_type to build each node's edge allocator
+    node_alloc m_node_alloc;
+
+    node_type* m_data = nullptr;
+    size_type m_size = 0;
+    size_type m_capacity = 0;
+
+    template <typename, typename, std::size_t> friend class CompleteTree;
+
     void DestroyAndFree() noexcept {
         // Deconstruct all nodes and then deallocate the memory
         for (size_type i = 0; i < m_size; i++)
@@ -296,12 +305,22 @@ private:
             throw std::out_of_range("node_graph index out of range");
     }
 
-    // Is also used after conversion back to allocator_type to build each node's edge allocator
-    node_alloc m_node_alloc;
-
-    node_type* m_data = nullptr;
-    size_type m_size = 0;
-    size_type m_capacity = 0;
+    // This method is beneficial in certain algorithms (like pop_back() in complete_tree.hpp).
+    // This is a very DANGEROUS method: it removes the last node without removing edges connected
+    // to the node. Therefore, it is up to the user to check that m_size != 0 and delete the edges
+    // connected to the node manually
+    void PopLast() noexcept {
+        // Increases time complexity to O(V + E)
+#ifndef NDEBUG
+        for (size_type i = 0; i + 1 < m_size; i++) {
+            for (size_type e : m_data[i].Edges()) {
+                assert(e != m_size - 1 && "PopLast(): an edge still points to the popped node");
+            }
+        }
+#endif
+        // Runs in O(1)
+        node_alloc_traits::destroy(m_node_alloc, m_data + --m_size);
+    }
 };
 
 template <typename T, typename Alloc = std::allocator<T>>
