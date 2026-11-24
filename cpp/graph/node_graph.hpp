@@ -4,6 +4,9 @@
 
 #include <stdexcept>
 #include <iostream>
+#include <iterator>
+#include <cassert>
+#include <utility>
 
 template <typename T, typename Alloc = std::allocator<T>>
 class NodeGraph {
@@ -18,33 +21,58 @@ private:
     using node_alloc_traits = std::allocator_traits<node_alloc>;
     using alloc_traits      = std::allocator_traits<Alloc>;
 
+    // If true, the destination takes over the source's allocator. If the old and new allocators
+    // differ, it first frees its memory with the old one
+    static constexpr bool pocca = node_alloc_traits::propagate_on_container_copy_assignment::value;
+
+    // If true, or if the allocators compare equal, it can take the buffer. Otherwise, it has to
+    // move elements one at a time into its own memory
+    static constexpr bool pocma = node_alloc_traits::propagate_on_container_move_assignment::value;
+
+    // If false and the allocators differ, the behaviour is undefined
+    static constexpr bool pocs  = node_alloc_traits::propagate_on_container_swap::value;
+
+    static constexpr bool always_equal = node_alloc_traits::is_always_equal::value;
+
 public:
-    explicit NodeGraph(const Alloc& alloc = Alloc()) 
-        : m_alloc(alloc)
-        , m_node_alloc(alloc) {}
+    explicit NodeGraph(const Alloc& alloc = Alloc())
+        : m_node_alloc(alloc) {}
 
     ~NodeGraph() {
         DestroyAndFree();
     }
 
-    NodeGraph(const NodeGraph&) = delete;
-    NodeGraph& operator=(const NodeGraph&) = delete;
+    // Ask the source which allocator a copy gets
+    NodeGraph(const NodeGraph& other, const Alloc& alloc)
+        : m_node_alloc(alloc) { CreateFrom(other); }
 
+    // Copy the source graph `other` into the source's arena
+    NodeGraph(const NodeGraph& other)
+        : NodeGraph(
+            other,
+            alloc_traits::select_on_container_copy_construction(other.GetAllocator())) {}
+
+    NodeGraph& operator=(const NodeGraph& other) {
+    }
+
+    // Allocator travels with the buffer
     NodeGraph(NodeGraph&& other) noexcept
-        : m_alloc(std::move(other.m_alloc))
-        , m_node_alloc(std::move(other.m_node_alloc))
-        , m_data(other.m_data)
-        , m_size(other.m_size)
-        , m_capacity(other.m_capacity) 
+        : m_node_alloc(other.m_node_alloc) { StealStorage(other); }
+
+    NodeGraph(NodeGraph&& other, const Alloc& alloc)
+        : m_node_alloc(alloc)
     {
-        other.m_data = nullptr;
-        other.m_size = 0;
-        other.m_capacity = 0;
+        // If this and other have the same allocator, steal the storage
+        // Otherwise, create this from other
+        if (m_node_alloc == other.m_node_alloc) {
+            StealStorage(other);
+        } else {
+            CreateFrom(other);
+        }
     }
 
     NodeGraph& operator=(NodeGraph&& other) noexcept {
         if (this != &other) {
-            std::swap(m_alloc, other.m_alloc);
             std::swap(m_node_alloc, other.m_node_alloc);
             std::swap(m_data, other.m_data);
             std::swap(m_size, other.m_size);
@@ -58,13 +86,12 @@ public:
         // Check current size to max capacity
         if (m_size == m_capacity) {
             size_type new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
-            Relocate(new_capacity);
+            Relocate<true>(new_capacity, std::forward<Args>(args)...);
+        } else {
+            node_alloc_traits::construct(
+                m_node_alloc, m_data + m_size,
+                GetAllocator(), std::forward<Args>(args)...);
         }
-
-        node_alloc_traits::construct(
-            m_node_alloc, m_data + m_size, 
-            m_alloc, std::forward<Args>(args)...);
-        
         return m_size++;
     }
 
@@ -90,7 +117,7 @@ public:
             Relocate(capacity);
     }
 
-    allocator_type GetAllocator() { return m_alloc; }
+    allocator_type GetAllocator() const noexcept { return allocator_type(m_node_alloc); }
 
     void Print(std::ostream& os = std::cout) {
         for (size_type i = 0; i < m_size; i++) {
@@ -120,13 +147,54 @@ private:
         m_capacity = 0;
     }
 
-    void Relocate(size_type new_capacity) {
+    // Take other's buffer, on the condition that this allocator == other's allocator
+    void StealStorage(NodeGraph& other) noexcept {
+        m_data = std::exchange(other.m_data, nullptr);
+        m_size = std::exchange(other.m_size, 0);
+        m_capacity = std::exchange(other.m_capacity, 0);
+    }
+
+    // Copy each node from other
+    void CreateFrom(const NodeGraph& other) {
+        CreateFromIter(static_cast<const node_type*>(other.m_data), other.m_size);
+    }
+
+    // Move each node out of other
+    void CreateFrom(NodeGraph&& other) {
+        CreateFromIter(std::make_move_iterator(other.m_data), other.m_size);
+    }
+
+    template <typename Iter>
+    void CreateFromIter(Iter it, size_type n) {
+        assert(m_data == nullptr && m_size == 0);
+        if (n == 0) return;
+        m_data = node_alloc_traits::allocate(m_node_alloc, n);
+        m_capacity = n;
+        try {
+            for (; m_size < n; ++m_size, ++it) {
+                node_alloc_traits::construct(m_node_alloc, m_data + m_size, *it, GetAllocator());
+            }
+        } catch (...) {
+            DestroyAndFree();
+            throw;
+        }
+    }
+
+    template <bool Emplace = false, typename... Args>
+    void Relocate(size_type new_capacity, Args&&... args) {
+        static_assert(Emplace || sizeof...(Args) == 0);
+
         // Allocate new chunk of memory and move the nodes over
         node_type* new_data = node_alloc_traits::allocate(m_node_alloc, new_capacity);
         size_type cnt = 0;
         try {
             for (; cnt < m_size; cnt++)
                 node_alloc_traits::construct(m_node_alloc, new_data + cnt, std::move(m_data[cnt]));
+            if constexpr (Emplace) {
+                node_alloc_traits::construct(
+                    m_node_alloc, m_data + m_size,
+                    GetAllocator(), std::forward<Args>(args)...);
+            }
         } catch (...) {
             for (size_type i = 0; i < cnt; i++)
                 node_alloc_traits::destroy(m_node_alloc, new_data + i);
@@ -145,12 +213,13 @@ private:
     }
 
     void CheckIndex(size_type idx) const {
-        if (idx >= m_size) 
+        if (idx >= m_size)
             throw std::out_of_range("node_graph index out of range");
     }
 
-    allocator_type m_alloc;     // Original allocator, needed for rebinding when allocating the edges
-    node_alloc m_node_alloc;    // Allocator for nodes
+    // Is also used after conversion back to allocator_type to build each node's edge allocator
+    node_alloc m_node_alloc;
+
     node_type* m_data = nullptr;
     size_type m_size = 0;
     size_type m_capacity = 0;

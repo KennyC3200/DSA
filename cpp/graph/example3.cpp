@@ -1,3 +1,5 @@
+// MUST BE COMPILED WITH std=c++20 because of complete_tree.hpp
+
 #include "complete_tree.hpp"
 #include "../arena_allocator/stack_arena.hpp"
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <memory>
+#include <utility>
 
 template <typename T, typename Alloc = std::allocator<T>>
 class Node {
@@ -18,6 +20,14 @@ public:
     explicit Node(const Alloc& alloc, Args&&... args)
         : m_val(std::forward<Args>(args)...)
         , m_edges(edge_alloc(alloc)) {}
+
+    Node(const Node& other, const Alloc& alloc) 
+        : m_val(other.m_val)
+        , m_edges(other.m_edges, edge_alloc(alloc)) {}
+
+    Node(Node&& other, const Alloc& alloc) 
+        : m_val(std::move(other.m_val))
+        , m_edges(std::move(other.m_edges), edge_alloc(alloc)) {}
 
     T& Val() noexcept { return m_val; }
     const T& Val() const noexcept{ return m_val; }
