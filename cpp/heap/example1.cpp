@@ -1,7 +1,6 @@
 // MUST BE COMPILED WITH -std=c++20 because of complete_tree.hpp
 
 #include "heap.hpp"
-#include <vector>
 
 using dtype = int;
 
