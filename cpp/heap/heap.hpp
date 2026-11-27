@@ -5,17 +5,20 @@
 #include <functional>
 #include <type_traits>
 #include <utility>
+#include <algorithm>
+#include <iostream>
+#include <string>
 #include "../graph/complete_tree.hpp"
 
 template <typename Container>
 struct container_arity : std::integral_constant<std::size_t, 2> {};
 
 template <typename T, typename Alloc, std::size_t Arity>
-struct container_arity<CompleteTree<T, Alloc, Arity>> 
+struct container_arity<CompleteTree<T, Alloc, Arity>>
     : std::integral_constant<std::size_t, Arity> {};
 
 template <
-    typename T, 
+    typename T,
     typename Container = std::vector<T>,
     typename Compare = std::less<typename Container::value_type>,
     std::size_t Arity = container_arity<Container>::value>
@@ -37,7 +40,7 @@ public:
 
     Heap() = default;
     explicit Heap(const Compare& comp, Container container = Container())
-        : m_container(std::move(container)), m_comp(comp) 
+        : m_container(std::move(container)), m_comp(comp)
     {
         const size_type n = size();
         if (n < 2) return;
@@ -90,6 +93,17 @@ public:
         if (n > 1) sift_down(0);
     }
 
+    // Prints the heap as a tree with branches, e.g. a binary max-heap:
+    // 9
+    // |-- 7
+    // |   |-- 3
+    // |   `-- 5
+    // `-- 8
+    //     `-- 6
+    void print(std::ostream& os = std::cout) const {
+        print_node(os, 0, "", true);
+    }
+
 private:
     Container m_container;
     Compare m_comp;
@@ -109,6 +123,22 @@ private:
     // k in [0, arity)
     static constexpr size_type child_idx(size_type i, size_type k) noexcept {
         return i * arity + k + 1;
+    }
+
+    // Prints node i, then recurses into its children. `prefix` holds the vertical bars
+    // inherited from ancestors, and `last` says whether i is its parent's last child
+    void print_node(std::ostream& os, size_type i, const std::string& prefix, bool last) const {
+        if (i >= size()) return;
+
+        os << prefix;
+        if (i != 0) os << (last ? "`-- " : "|-- ");
+        os << m_container[i] << '\n';
+
+        const std::string child_prefix = prefix + (i == 0 ? "" : (last ? "    " : "|   "));
+        const size_type first = child_idx(i, 0);
+        const size_type end = std::min(first + arity, size());
+        for (size_type c = first; c < end; ++c)
+            print_node(os, c, child_prefix, c + 1 == end);
     }
 
     void sift_up(size_type i) {
